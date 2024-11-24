@@ -7,12 +7,15 @@ import {
   useState,
 } from 'react';
 
-const BASE_URL = 'http://localhost:3000';
+const SERVER_BASE_URL: string =
+  import.meta.env.SERVER_BASE_URL || 'http://localhost:3000';
 
 const USER = {
   user_id: '01935bfd-357c-7b04-b466-1f292b9a7d54',
   username: 'doingus',
 };
+
+const MESSAGES_POLL_RATE = 1000 * 5;
 
 type Message = {
   id: string;
@@ -36,7 +39,7 @@ function App(): JSX.Element {
 
   useEffect(() => {
     async function fetchMessages(): Promise<Message[]> {
-      const res = await fetch(`${BASE_URL}/messages`);
+      const res = await fetch(`${SERVER_BASE_URL}/messages`);
       const parsed = (await res.json()) as Message[];
       return parsed;
     }
@@ -64,7 +67,7 @@ function App(): JSX.Element {
     if (isSendingRef.current) {
       return;
     }
-    fetch(`${BASE_URL}/messages`, {
+    fetch(`${SERVER_BASE_URL}/messages`, {
       method: 'POST',
       body: JSON.stringify({
         time: Date.now(),
@@ -78,6 +81,17 @@ function App(): JSX.Element {
         setPendingMessage('');
       })
       .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    // Poll every MESSAGES_POLL_RATE millis
+    const interval = setInterval(() => {
+      setLoaded(false);
+    }, MESSAGES_POLL_RATE);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   return (
