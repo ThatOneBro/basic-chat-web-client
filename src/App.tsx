@@ -7,8 +7,8 @@ import {
   useState,
 } from 'react';
 
-const SERVER_BASE_URL: string =
-  import.meta.env.SERVER_BASE_URL || 'http://localhost:3000';
+const VITE_SERVER_BASE_URL: string =
+  import.meta.env.VITE_SERVER_BASE_URL || 'http://localhost:3000';
 
 const USER = {
   user_id: '01935bfd-357c-7b04-b466-1f292b9a7d54',
@@ -39,7 +39,7 @@ function App(): JSX.Element {
 
   useEffect(() => {
     async function fetchMessages(): Promise<Message[]> {
-      const res = await fetch(`${SERVER_BASE_URL}/messages`);
+      const res = await fetch(`${VITE_SERVER_BASE_URL}/messages`);
       const parsed = (await res.json()) as Message[];
       return parsed;
     }
@@ -67,7 +67,7 @@ function App(): JSX.Element {
     if (isSendingRef.current) {
       return;
     }
-    fetch(`${SERVER_BASE_URL}/messages`, {
+    fetch(`${VITE_SERVER_BASE_URL}/messages`, {
       method: 'POST',
       body: JSON.stringify({
         time: Date.now(),
