@@ -1,3 +1,5 @@
+import type { MessagePayload } from '../chat/datatypes';
+
 export type MsgType = 'chat';
 
 export type BaseWebSocketMsg = {
@@ -8,6 +10,7 @@ export type BaseWebSocketMsg = {
 
 export type ChatMsg = BaseWebSocketMsg & {
   type: 'chat';
+  payload: Omit<MessagePayload, 'id'>;
 };
 
 export type InteractMsg = BaseWebSocketMsg & {

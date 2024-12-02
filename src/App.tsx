@@ -6,7 +6,12 @@ import {
   useRef,
   useState,
 } from 'react';
-import { type NetContext, connectToWebSocketServer } from './net/websocket';
+import type { MessagePayload } from './chat/datatypes';
+import {
+  type NetContext,
+  connectToWebSocketServer,
+  sendMsg,
+} from './net/websocket';
 
 const VITE_SERVER_BASE_URL: string =
   import.meta.env.VITE_SERVER_BASE_URL || 'http://localhost:3000';
@@ -18,22 +23,15 @@ const USER = {
 
 const MESSAGES_POLL_RATE = 1000 * 5;
 
-type Message = {
-  id: string;
-  time: number;
-  user_id: string;
-  username: string;
-  text: string;
-  channel: string;
-  reply_to?: string;
-};
-
 function App(): JSX.Element {
   const [loaded, setLoaded] = useState(false);
-  const [messages, setMessages] = useState<Message[]>();
+  const [messages, setMessages] = useState<MessagePayload[]>();
   const loadingRef = useRef(false);
-  const [_wsCtx, setWsCtx] = useState<NetContext>();
   const connectingRef = useRef(false);
+
+  const [wsCtx, setWsCtx] = useState<NetContext>();
+  const wsCtxRef = useRef(wsCtx);
+  wsCtxRef.current = wsCtx;
 
   const [pendingMessage, setPendingMessage] = useState('');
   const pendingMessageRef = useRef(pendingMessage);
@@ -45,25 +43,25 @@ function App(): JSX.Element {
     async function connect(): Promise<void> {
       const wsCtx = await connectToWebSocketServer(VITE_SERVER_BASE_URL);
 
-      wsCtx.ws.addEventListener('open', () => {
-        wsCtx.ws.addEventListener('message', () => {
-          setLoaded(false);
-        });
+      wsCtx.ws.addEventListener('message', () => {
+        setLoaded(false);
       });
 
       setWsCtx(wsCtx);
     }
 
     if (!connectingRef.current) {
-      connect().catch(console.error);
       connectingRef.current = true;
+      connect().catch(console.error);
     }
   }, []);
 
   useEffect(() => {
-    async function fetchMessages(): Promise<Message[]> {
-      const res = await fetch(`${VITE_SERVER_BASE_URL}/messages`);
-      const parsed = (await res.json()) as Message[];
+    async function fetchMessages(): Promise<MessagePayload[]> {
+      const res = await fetch(`${VITE_SERVER_BASE_URL}/messages`, {
+        cache: 'reload',
+      });
+      const parsed = (await res.json()) as MessagePayload[];
       return parsed;
     }
 
@@ -90,14 +88,17 @@ function App(): JSX.Element {
     if (isSendingRef.current) {
       return;
     }
+
+    const payload = {
+      time: Date.now(),
+      ...USER,
+      text: pendingMessageRef.current,
+      channel: 'main',
+    } satisfies Partial<MessagePayload>;
+
     fetch(`${VITE_SERVER_BASE_URL}/messages`, {
       method: 'POST',
-      body: JSON.stringify({
-        time: Date.now(),
-        ...USER,
-        text: pendingMessageRef.current,
-        channel: 'main',
-      } satisfies Partial<Message>),
+      body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
     })
       .then(() => {
@@ -105,6 +106,15 @@ function App(): JSX.Element {
         setPendingMessage('');
       })
       .catch(console.error);
+
+    if (wsCtxRef.current) {
+      sendMsg(wsCtxRef.current.ws, {
+        time: Date.now(),
+        type: 'chat',
+        channel: 'main',
+        payload,
+      });
+    }
   }, []);
 
   useEffect(() => {
