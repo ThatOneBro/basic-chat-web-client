@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { type NetContext, connectToWebSocketServer } from './net/websocket';
 
 const VITE_SERVER_BASE_URL: string =
   import.meta.env.VITE_SERVER_BASE_URL || 'http://localhost:3000';
@@ -23,19 +24,41 @@ type Message = {
   user_id: string;
   username: string;
   text: string;
-  reply_to: string | null;
+  channel: string;
+  reply_to?: string;
 };
 
 function App(): JSX.Element {
   const [loaded, setLoaded] = useState(false);
   const [messages, setMessages] = useState<Message[]>();
   const loadingRef = useRef(false);
+  const [_wsCtx, setWsCtx] = useState<NetContext>();
+  const connectingRef = useRef(false);
 
   const [pendingMessage, setPendingMessage] = useState('');
   const pendingMessageRef = useRef(pendingMessage);
   pendingMessageRef.current = pendingMessage;
 
   const isSendingRef = useRef(false);
+
+  useEffect(() => {
+    async function connect(): Promise<void> {
+      const wsCtx = await connectToWebSocketServer(VITE_SERVER_BASE_URL);
+
+      wsCtx.ws.addEventListener('open', () => {
+        wsCtx.ws.addEventListener('message', () => {
+          setLoaded(false);
+        });
+      });
+
+      setWsCtx(wsCtx);
+    }
+
+    if (!connectingRef.current) {
+      connect().catch(console.error);
+      connectingRef.current = true;
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchMessages(): Promise<Message[]> {
@@ -51,7 +74,7 @@ function App(): JSX.Element {
       // Fetch
       fetchMessages()
         .then((messages) => {
-          setMessages(messages);
+          setMessages(messages.sort((a, b) => a.time - b.time));
           setLoaded(true);
         })
         .catch(console.error)
@@ -73,6 +96,7 @@ function App(): JSX.Element {
         time: Date.now(),
         ...USER,
         text: pendingMessageRef.current,
+        channel: 'main',
       } satisfies Partial<Message>),
       headers: { 'Content-Type': 'application/json' },
     })
